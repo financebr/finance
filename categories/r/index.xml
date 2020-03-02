@@ -31,25 +31,5 @@ A ideia é que o estudo mostre quem “ganha mais” ao considerar todos as poss
 A título de resumo, o CAPM (Capital Asset Pricing Model) é um modelo criado por William Sharpe que estima o retorno de um ativo com base no retorno do mercado e na relação linear do ativo com o retorno do mercado.</description>
     </item>
     
-    <item>
-      <title>Testando post</title>
-      <link>/2020/03/01/testando-post/</link>
-      <pubDate>Sun, 01 Mar 2020 00:00:00 +0000</pubDate>
-      
-      <guid>/2020/03/01/testando-post/</guid>
-      <description>testando 123</description>
-    </item>
-    
-    <item>
-      <title>Hello R Markdown</title>
-      <link>/2015/07/23/hello-r-markdown/</link>
-      <pubDate>Thu, 23 Jul 2015 21:13:14 -0500</pubDate>
-      
-      <guid>/2015/07/23/hello-r-markdown/</guid>
-      <description>R MarkdownThis is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see http://rmarkdown.rstudio.com.
-You can embed an R code chunk like this:
-summary(cars)## speed dist ## Min. : 4.0 Min. : 2.00 ## 1st Qu.:12.0 1st Qu.: 26.00 ## Median :15.0 Median : 36.00 ## Mean :15.4 Mean : 42.98 ## 3rd Qu.</description>
-    </item>
-    
   </channel>
 </rss>
