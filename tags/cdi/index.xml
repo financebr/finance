@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>cdi on Finance R</title>
+    <link>/tags/cdi/</link>
+    <description>Recent content in cdi on Finance R</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>en-us</language>
+    <lastBuildDate>Sun, 01 Mar 2020 00:00:00 +0000</lastBuildDate>
+    
+	<atom:link href="/tags/cdi/index.xml" rel="self" type="application/rss+xml" />
+    
+    
+    <item>
+      <title>Comparando o retorno histórico do CDI e do Ibovespa</title>
+      <link>/2020/03/01/comparando-cdi-ibovespa/</link>
+      <pubDate>Sun, 01 Mar 2020 00:00:00 +0000</pubDate>
+      
+      <guid>/2020/03/01/comparando-cdi-ibovespa/</guid>
+      <description>IntroduçãoNas últimas décadas, o que rendeu mais: CDI ou o Ibovespa? Como podemos utilizar o R para verificar (de forma simplista) essa pergunta?
+A ideia é que o estudo mostre quem “ganha mais” ao considerar todos as possibilidades (janelas) de compra e venda entre 1986 e 2019. A pessoa que ficou 50 dias úteis com os dois ativos ou aquela que fez um buy &amp;amp; hold por 4000 dias úteis será representada pelo estudo, seja em qualquer data que ela tenha operado entre 1986 e 2019.</description>
+    </item>
+    
+  </channel>
+</rss>

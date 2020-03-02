@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="en-us">
+  <head>
+    <meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="generator" content="Hugo 0.65.3" />
+
+
+<title>Comparando o retorno histórico do CDI e do Ibovespa - Finance R</title>
+<meta property="og:title" content="Comparando o retorno histórico do CDI e do Ibovespa - Finance R">
+
+
+  <link href='/favicon.ico' rel='icon' type='image/x-icon'/>
+
+
+
+  
+
+
+
+
+
+
+
+
+<link href='//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/styles/github.min.css' rel='stylesheet' type='text/css' />
+
+
+
+<link rel="stylesheet" href="/css/fonts.css" media="all">
+<link rel="stylesheet" href="/css/main.css" media="all">
+
+
+
+  </head>
+  <body>
+    <div class="wrapper">
+      <header class="header">
+        <nav class="nav">
+  <a href="/" class="nav-logo">
+    <img src="/images/logo2.png"
+         width="50"
+         height="50"
+         alt="Logo">
+  </a>
+
+  <ul class="nav-links">
+    
+    <li><a href="/about/">About</a></li>
+    
+    <li><a href="https://www.linkedin.com/in/arthurlulamota/">LinkedIn</a></li>
+    
+    <li><a href="https://twitter.com/arthurlulam">Twitter</a></li>
+    
+  </ul>
+</nav>
+
+      </header>
+
+
+<main class="content" role="main">
+
+  <article class="article">
+    
+    <span class="article-duration">5 min read</span>
+    
+
+    <h1 class="article-title">Comparando o retorno histórico do CDI e do Ibovespa</h1>
+
+    
+    <span class="article-date">2020-03-01</span>
+    
+
+    <div class="article-content">
+      
+
+
+<div id="introdução" class="section level1">
+<h1>Introdução</h1>
+<p>Nas últimas décadas, o que rendeu mais: CDI ou o Ibovespa? Como podemos utilizar o <strong>R</strong> para verificar (de forma simplista) essa pergunta?</p>
+<p>A ideia é que o estudo mostre quem “ganha mais” ao considerar todos as possibilidades (janelas) de compra e venda entre 1986 e 2019. A pessoa que ficou 50 dias úteis com os dois ativos ou aquela que fez um buy &amp; hold por 4000 dias úteis será representada pelo estudo, seja em qualquer data que ela tenha operado entre 1986 e 2019.</p>
+<p>Cabe aqui ressaltar que não estamos entrando no debate se renda variável é superior ou não a renda fixa, independente do prazo. Como estamos tratando apenas de Ibovespa e CDI e não possuimos o conhecimento de todos os ativos relevantes para tal comparação, vamos nos limitar a comparação direta de ganhos envolvendo apenas esses ativos.</p>
+<p>Vale destacar também que não é levado em consideração custos de transações, apenas o resultado fruto da operação do preço de saída e de entrada (podendo ser negativo ou positivo).</p>
+</div>
+<div id="baixando-os-dados-de-cdi-e-ibovespa" class="section level1">
+<h1>Baixando os dados de CDI e Ibovespa</h1>
+<p>Vamos inicialmente baixar os dados do Ibovespa. É possível fazer isso de forma rápida com packages como o <code>quantmod</code>, mas a série é muito curta. Dessa forma, vamos utilizar as informações disponíveis no Ipea Data, que nos disponibiliza uma séries históricas mais longas.</p>
+<pre class="r"><code>library(ipeaData)
+library(dplyr)
+library(purrr)
+library(glue)
+library(readxl)
+library(xml2)
+library(ggplot2)
+library(tidyr)
+
+download_data_ibovespa_file &lt;- function() {
+    download.file(&#39;http://bvmf.bmfbovespa.com.br/indices/download/IBOVDIA.zip&#39;,
+                destfile = &quot;IBOVDIA.zip&quot;)
+  unzip(&quot;IBOVDIA.zip&quot;,exdir = &quot;.&quot;)
+}
+
+read_ibovespa_year_file &lt;- function(year) {
+   readxl::read_excel(unzip(&quot;IBOVDIA.zip&quot;,exdir = &quot;.&quot;),
+                     sheet = as.character(year),
+                     range = &quot;A3:M33&quot;,
+                     col_names = c(&quot;Dia&quot;, 1:12)
+  ) %&gt;%
+    dplyr::slice(1:31) %&gt;%
+    dplyr::mutate(Ano = year) 
+}
+
+download_data_ibovespa_file()
+ibov &lt;- 1968:1997 %&gt;%
+  map(read_ibovespa_year_file) %&gt;%
+  bind_rows() %&gt;%
+  gather(mes, ibov_valor, -Dia, - Ano) %&gt;%
+  mutate(data = stringr::str_c(Dia,&quot;/&quot;, mes, &quot;/&quot;,Ano) %&gt;%
+           lubridate::dmy()) %&gt;%
+  filter(!is.na(data)) %&gt;%
+  select(-(Dia:mes))
+
+ibov_ipea &lt;- ipeadata(&#39;GM366_IBVSP366&#39;) %&gt;%
+  mutate(data = stringr::str_c(DIA,&quot;/&quot;, MES, &quot;/&quot;,ANO) %&gt;%
+           lubridate::dmy()) %&gt;%
+  filter(!is.na(data)) %&gt;%
+  select(data, ibov_valor = VALVALOR) %&gt;%
+  filter(lubridate::year(data) &gt;= 1998 )
+## [1] &quot;Bolsa de Valores, Mercadorias e Futuros (BM&amp;FBovespa). 07/1994 a 02/2020. Acesso em: 01/03/2020&quot;
+
+ibov &lt;- bind_rows(ibov, ibov_ipea)</code></pre>
+<p>Agora é a vez de baixarmos os dados do CDI e agregar junto à série do Ibov.</p>
+<pre class="r"><code>cdi &lt;- ipeadata(&#39;GM366_TJOVER366&#39;)
+## [1] &quot;NA. 06/1986 a 02/2020. Acesso em: 01/03/2020&quot;
+cdi &lt;- cdi %&gt;% 
+  mutate(data = stringr::str_c(DIA, &quot;/&quot;, MES, &quot;/&quot;, ANO) %&gt;%
+           lubridate::dmy()) %&gt;%
+  mutate(cdi_valor =  (1 + VALVALOR/100)^(1/252)-1) %&gt;%
+  select(data, cdi_valor) 
+
+dados &lt;- inner_join(ibov, cdi)</code></pre>
+<p>Desta forma, a série do Ibovespa desde 1986 é a junção dos dados da B3 e do IpeaData, ao passo que o resultado do CDI tem como base única o IpeaData.</p>
+</div>
+<div id="elaborando-as-comparações" class="section level1">
+<h1>Elaborando as comparações</h1>
+<p>Com os dados juntos, é possível criar as comparações de forma semelhante ao estudo no Valor, com janelas com mais de 5 mil dias úteis. Inicialmente vamos reportar os resultados considerando o período de 1986 até 2019.</p>
+<p>Para facilitar trabalho, foi criado um índice CDI, que reflete os resultados diários, o que facilita o cálculo do ganhos ou perdas, assim como já é feito no Ibovespa.</p>
+<pre class="r"><code>dados &lt;- dados %&gt;%
+  filter(lubridate::year(data) &gt;= 1986) %&gt;%
+  # 1)
+  filter(!is.na(cdi_valor) | !is.na(ibov_valor)) %&gt;%
+  arrange(data) %&gt;%
+  # 2)
+  tidyr::fill(ibov_valor) %&gt;%
+  # 3)
+  mutate(cdi_valor = ifelse(is.na(cdi_valor), 0, cdi_valor))
+
+dados &lt;- dados %&gt;%
+  mutate(cdi_index = (1 + cdi_valor) %&gt;%
+           accumulate(`*`)) %&gt;%
+  mutate(first_ibov = first(ibov_valor)) %&gt;%
+  mutate(cdi_index = cdi_index * first(ibov_valor))
+
+retorna_resultado &lt;- function(dados, janela) {
+  dados %&gt;%
+    filter(lubridate::year(data) &gt;= 1986) %&gt;%
+    mutate(cdi_diferenca = lead(cdi_index, janela)/cdi_index - 1,
+           ibov_diferenca = lead(ibov_valor, janela)/ibov_valor - 1) %&gt;%
+    mutate(resultado = cdi_diferenca &gt; ibov_diferenca) %&gt;%
+    summarise(resultado = mean(resultado, na.rm=T)) %&gt;%
+    pull(resultado)
+  
+}
+
+resultados &lt;- tibble(janelas = 1:10000)
+resultados &lt;- resultados %&gt;%
+  mutate(cdi_vitoria = map_dbl(janelas, ~ retorna_resultado(dados, .x))) 
+
+resultados &lt;- bind_rows(resultados %&gt;% 
+                          mutate(ativo = &quot;CDI&quot;) %&gt;%
+                          rename(vitoria = cdi_vitoria),
+                        resultados %&gt;% 
+                          mutate(ativo = &quot;IBOVESPA&quot;, 
+                                 vitoria = 1 - cdi_vitoria))
+
+ggplot(resultados %&gt;%
+         filter(!is.na(vitoria))) +
+  geom_line(aes(x = janelas, y = vitoria, color = ativo)) +
+  theme_bw()</code></pre>
+<p><img src="/post/comparando-cdi-ibovespa_files/figure-html/unnamed-chunk-3-1.png" width="672" /></p>
+<p>Cosiderando apenas o período pós Real, ou seja, de 1994 até 2019</p>
+<pre class="r"><code>retorna_resultado &lt;- function(dados, janela) {
+  dados %&gt;%
+    filter(lubridate::year(data) &gt;= 1994) %&gt;%
+    mutate(cdi_diferenca = lead(cdi_index, janela)/cdi_index - 1,
+           ibov_diferenca = lead(ibov_valor, janela)/ibov_valor - 1) %&gt;%
+    mutate(resultado = cdi_diferenca &gt; ibov_diferenca) %&gt;%
+    summarise(resultado = mean(resultado, na.rm=T)) %&gt;%
+    pull(resultado)
+  
+}
+
+resultados &lt;- tibble(janelas = 1:10000)
+resultados &lt;- resultados %&gt;%
+  mutate(cdi_vitoria = map_dbl(janelas, ~ retorna_resultado(dados, .x))) 
+
+resultados &lt;- bind_rows(resultados %&gt;% 
+                          mutate(ativo = &quot;CDI&quot;) %&gt;%
+                          rename(vitoria = cdi_vitoria),
+                        resultados %&gt;% 
+                          mutate(ativo = &quot;IBOVESPA&quot;, 
+                                 vitoria = 1 - cdi_vitoria))
+
+ggplot(resultados %&gt;%
+         filter(!is.na(vitoria))) +
+  geom_line(aes(x = janelas, y = vitoria, color = ativo)) +
+  theme_bw()</code></pre>
+<p><img src="/post/comparando-cdi-ibovespa_files/figure-html/unnamed-chunk-4-1.png" width="672" /></p>
+<p>Considerando apenas o século XXI, de 2000 até 2019.</p>
+<pre class="r"><code>retorna_resultado &lt;- function(dados, janela) {
+  dados %&gt;%
+    filter(lubridate::year(data) &gt;= 2000) %&gt;%
+    mutate(cdi_diferenca = lead(cdi_index, janela)/cdi_index - 1,
+           ibov_diferenca = lead(ibov_valor, janela)/ibov_valor - 1) %&gt;%
+    mutate(resultado = cdi_diferenca &gt; ibov_diferenca) %&gt;%
+    summarise(resultado = mean(resultado, na.rm=T)) %&gt;%
+    pull(resultado)
+  
+}
+
+resultados &lt;- tibble(janelas = 1:10000)
+resultados &lt;- resultados %&gt;%
+  mutate(cdi_vitoria = map_dbl(janelas, ~ retorna_resultado(dados, .x))) 
+
+resultados &lt;- bind_rows(resultados %&gt;% 
+                          mutate(ativo = &quot;CDI&quot;) %&gt;%
+                          rename(vitoria = cdi_vitoria),
+                        resultados %&gt;% 
+                          mutate(ativo = &quot;IBOVESPA&quot;, 
+                                 vitoria = 1 - cdi_vitoria))
+
+ggplot(resultados %&gt;%
+         filter(!is.na(vitoria))) +
+  geom_line(aes(x = janelas, y = vitoria, color = ativo)) +
+  theme_bw()</code></pre>
+<p><img src="/post/comparando-cdi-ibovespa_files/figure-html/unnamed-chunk-5-1.png" width="672" /></p>
+<p>E, por fim, considerando apenas o período pós 2016, para pegar os resultados pós-impeachment. Naturalmente o período se encurtou, sendo possível avaliar o que aconteceu em janelas de menos de 1000 dias úteis. Nesse caso, considerando um período curto e momento de otimismo, o Ibovespa venceu o CDI na maior parte das vezes.</p>
+<pre class="r"><code>retorna_resultado &lt;- function(dados, janela) {
+  dados %&gt;%
+    filter(lubridate::year(data) &gt;= 2016) %&gt;%
+    mutate(cdi_diferenca = lead(cdi_index, janela)/cdi_index - 1,
+           ibov_diferenca = lead(ibov_valor, janela)/ibov_valor - 1) %&gt;%
+    mutate(resultado = cdi_diferenca &gt; ibov_diferenca) %&gt;%
+    summarise(resultado = mean(resultado, na.rm=T)) %&gt;%
+    pull(resultado)
+  
+}
+
+resultados &lt;- tibble(janelas = 1:10000)
+resultados &lt;- resultados %&gt;%
+  mutate(cdi_vitoria = map_dbl(janelas, ~ retorna_resultado(dados, .x))) 
+
+resultados &lt;- bind_rows(resultados %&gt;% 
+                          mutate(ativo = &quot;CDI&quot;) %&gt;%
+                          rename(vitoria = cdi_vitoria),
+                        resultados %&gt;% 
+                          mutate(ativo = &quot;IBOVESPA&quot;, 
+                                 vitoria = 1 - cdi_vitoria))
+
+ggplot(resultados %&gt;%
+         filter(!is.na(vitoria))) +
+  geom_line(aes(x = janelas, y = vitoria, color = ativo)) +
+  theme_bw()</code></pre>
+<p><img src="/post/comparando-cdi-ibovespa_files/figure-html/unnamed-chunk-6-1.png" width="672" /></p>
+</div>
+<div id="conclusão" class="section level1">
+<h1>Conclusão</h1>
+<p>Os resultados sugerem que os ganhos do CDI batem o Ibovespa na maior parte das janelas e períodos avaliados, exceto o mais recente (pós-impeachment)</p>
+<p>Isso quer dizer que daqui para frente será o mesmo? NÂO. O resultado de um período longo de bull market e juros baixos podem inverter os resultados no futuro, por exemplo.</p>
+</div>
+
+    </div>
+  </article>
+
+  
+
+
+</main>
+
+      <footer class="footer">
+        <ul class="footer-links">
+          <li>
+            <a href="/index.xml" type="application/rss+xml" target="_blank">RSS feed</a>
+          </li>
+          <li>
+            <a href="https://gohugo.io/" class="footer-links-kudos">Made with <img src="/images/hugo-logo.png" alt="Img link to Hugo website" width="22" height="22"></a>
+          </li>
+        </ul>
+      </footer>
+
+    </div>
+    
+
+
+
+<script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/highlight.min.js"></script>
+
+
+
+<script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/languages/r.min.js"></script>
+<script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/languages/yaml.min.js"></script>
+<script>hljs.configure({languages: []}); hljs.initHighlightingOnLoad();</script>
+
+
+
+    
+
+    
+  </body>
+</html>
+

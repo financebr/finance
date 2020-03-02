@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en-us">
+  <head>
+    <meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="generator" content="Hugo 0.65.3" />
+
+
+<title>Entendendo o CAPM e o seu beta - Finance R</title>
+<meta property="og:title" content="Entendendo o CAPM e o seu beta - Finance R">
+
+
+  <link href='/favicon.ico' rel='icon' type='image/x-icon'/>
+
+
+
+  
+
+
+
+
+
+
+
+
+<link href='//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/styles/github.min.css' rel='stylesheet' type='text/css' />
+
+
+
+<link rel="stylesheet" href="/css/fonts.css" media="all">
+<link rel="stylesheet" href="/css/main.css" media="all">
+
+
+
+  </head>
+  <body>
+    <div class="wrapper">
+      <header class="header">
+        <nav class="nav">
+  <a href="/" class="nav-logo">
+    <img src="/images/logo2.png"
+         width="50"
+         height="50"
+         alt="Logo">
+  </a>
+
+  <ul class="nav-links">
+    
+    <li><a href="/about/">About</a></li>
+    
+    <li><a href="https://www.linkedin.com/in/arthurlulamota/">LinkedIn</a></li>
+    
+    <li><a href="https://twitter.com/arthurlulam">Twitter</a></li>
+    
+  </ul>
+</nav>
+
+      </header>
+
+
+<main class="content" role="main">
+
+  <article class="article">
+    
+    <span class="article-duration">3 min read</span>
+    
+
+    <h1 class="article-title">Entendendo o CAPM e o seu beta</h1>
+
+    
+    <span class="article-date">2020-03-01</span>
+    
+
+    <div class="article-content">
+      
+
+
+<div id="introdução" class="section level1">
+<h1>Introdução</h1>
+<p>Hoje, continuaremos divertidos em nosso portfólio, calculando o CAPM beta dos retornos de nosso portfólio. Isso implicará na adaptação de um modelo linear e, quando chegarmos à visualização da próxima vez, considerando o significado de nossos resultados na perspectiva do retorno dos ativos.</p>
+<p>A título de resumo, o CAPM (Capital Asset Pricing Model) é um modelo criado por William Sharpe que estima o retorno de um ativo com base no retorno do mercado e na relação linear do ativo com o retorno do mercado. Essa relação linear é o coeficiente beta da ação, ou apenas o bom e velho beta.</p>
+<p>O CAPM foi introduzido em 1964, ganhou o Nobel de seu criador e, como muitas teorias de importância efetiva, tem sido amplamente utilizado, atualizado, criticado, desmascarado, revivido, re-desmascarado etc. Fama e French escreveram que o CAPM “é a peça central dos cursos de investimento em MBA. De fato, muitas vezes é o único modelo de precificação de ativos ensinado nesses cursos infelizmente, o registro empírico do modelo é ruim.” 1</p>
+<p>Com isso, avançaremos com nossa análise, pois calcular betas do CAPM pode servir como um bom modelo para modelos mais complexos no trabalho de uma equipe e, às vezes, é uma boa idéia começar com um modelo simples, mesmo que não resista rigor empírico. Além disso, pode ter sido questionado por pesquisas futuras, mas ainda é um modelo icônico que devemos aprender e amar.</p>
+<p>Vamos nos concentrar em um aspecto particular do CAPM: beta. Beta, como observamos acima, é o coeficiente beta de um ativo que resulta da regressão dos retornos desse ativo nos retornos do mercado. Captura a relação linear entre o ativo / portfólio e o mercado. Para nossos propósitos, é um bom veículo para explorar fluxos reproduzíveis para modelar ou regredir os retornos de nosso portfólio sobre os retornos do mercado. Mesmo que sua equipe não goste do CAPM em favor de modelos com mais nuances, esses fluxos de código podem servir como uma boa base para a construção desses modelos mais complexos.</p>
+<p>Vamos calcular o beta de várias maneiras: manualmente (para fins ilustrativos), no <code>xts</code> mundo com <code>PerformanceAnalytics</code>, no sentido inverso com <code>dplyr</code> e no <code>tidyquant</code>. Esses parecem ser os paradigmas mais populares para o trabalho de séries temporais financeiras, e mesmo dentro de uma equipe pode haver preferências diferentes. Não acho que todos precisem trabalhar com cada paradigma, mas acho útil ser fluente, ou, pelo menos, familiar, nos vários mundos. Se você é um tipo <code>tidyverse</code> da pessoa, mas necessidade de colaborar com um <code>xts</code> ou <code>tidyquant</code> entusiasta, ele vai ajudar se cada um de vocês está familiarizado com os três universos (embora em algum momento ya só tem que escolher um fluxo de código e fazer outras coisas).</p>
+<p>Trabalharemos e calcularemos a versão beta do nosso portfólio habitual, composto por:</p>
+<pre class="r"><code>library(tidyquant)
+library(tidyverse)
+library(timetk)
+library(tibbletime)
+library(broom)
+
+symbols &lt;- c(&quot;SPY&quot;,&quot;EFA&quot;, &quot;IJS&quot;, &quot;EEM&quot;,&quot;AGG&quot;)
+
+prices &lt;- 
+  getSymbols(symbols, src = &#39;yahoo&#39;, 
+             from = &quot;2013-01-01&quot;,
+             to = &quot;2017-12-31&quot;,
+             auto.assign = TRUE, warnings = FALSE) %&gt;% 
+  map(~Ad(get(.))) %&gt;%
+  reduce(merge) %&gt;% 
+  `colnames&lt;-`(symbols)
+
+prices_monthly &lt;- to.monthly(prices, indexAt = &quot;last&quot;, OHLC = FALSE)
+
+asset_returns_xts &lt;- na.omit(Return.calculate(prices_monthly, method = &quot;log&quot;))
+
+w &lt;- c(0.25, 0.25, 0.20, 0.20, 0.10)
+
+portfolio_returns_xts_rebalanced_monthly &lt;- 
+  Return.portfolio(asset_returns_xts, weights = w, rebalance_on = &quot;months&quot;) %&gt;%
+  `colnames&lt;-`(&quot;returns&quot;) 
+
+asset_returns_long &lt;-  
+  prices %&gt;% 
+  to.monthly(indexAt = &quot;last&quot;, OHLC = FALSE) %&gt;% 
+  tk_tbl(preserve_index = TRUE, rename_index = &quot;date&quot;) %&gt;%
+  gather(asset, returns, -date) %&gt;% 
+  group_by(asset) %&gt;%  
+  mutate(returns = (log(returns) - log(lag(returns)))) %&gt;% 
+  na.omit()
+
+portfolio_returns_tq_rebalanced_monthly &lt;- 
+  asset_returns_long %&gt;%
+  tq_portfolio(assets_col  = asset, 
+               returns_col = returns,
+               weights     = w,
+               col_rename  = &quot;returns&quot;,
+               rebalance_on = &quot;months&quot;)</code></pre>
+</div>
+<div id="including-plots" class="section level1">
+<h1>Including Plots</h1>
+<p>You can also embed plots. See Figure <a href="#fig:pie">1</a> for example:</p>
+<pre class="r"><code>par(mar = c(0, 1, 0, 1))
+pie(
+  c(280, 60, 20),
+  c(&#39;Sky&#39;, &#39;Sunny side of pyramid&#39;, &#39;Shady side of pyramid&#39;),
+  col = c(&#39;#0292D8&#39;, &#39;#F7EA39&#39;, &#39;#C4B632&#39;),
+  init.angle = -50, border = NA
+)</code></pre>
+<div class="figure"><span id="fig:pie"></span>
+<img src="/post/2020-03-01-entendendo-o-capm-e-o-seu-beta_files/figure-html/pie-1.png" alt="A fancy pie chart." width="672" />
+<p class="caption">
+Figure 1: A fancy pie chart.
+</p>
+</div>
+</div>
+
+    </div>
+  </article>
+
+  
+
+
+</main>
+
+      <footer class="footer">
+        <ul class="footer-links">
+          <li>
+            <a href="/index.xml" type="application/rss+xml" target="_blank">RSS feed</a>
+          </li>
+          <li>
+            <a href="https://gohugo.io/" class="footer-links-kudos">Made with <img src="/images/hugo-logo.png" alt="Img link to Hugo website" width="22" height="22"></a>
+          </li>
+        </ul>
+      </footer>
+
+    </div>
+    
+
+
+
+<script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/highlight.min.js"></script>
+
+
+
+<script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/languages/r.min.js"></script>
+<script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/languages/yaml.min.js"></script>
+<script>hljs.configure({languages: []}); hljs.initHighlightingOnLoad();</script>
+
+
+
+    
+
+    
+  </body>
+</html>
+
